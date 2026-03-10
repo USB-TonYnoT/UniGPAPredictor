@@ -492,14 +492,18 @@ async function initSession(mode) {
 
     if (mode === 'load') {
         try {
+            // Using the modern File System Access API as you had it
             const [handle] = await window.showOpenFilePicker({ 
-                types: [{ description: 'CSV', accept: {'text/csv': ['.csv']} }] 
+                types: [{ description: 'JSON', accept: {'application/json': ['.json']} }] 
             });
             activeFileHandle = handle;
             const file = await handle.getFile();
-            const csvText = await file.text();
-            parseCSV(csvText);
+            const data = JSON.parse(await file.text());
             
+            // Handle both simple arrays or object-wrapped data
+            courses = data.courses || data || [];
+            
+            // Success: Switch frames
             welcomeSection.style.display = 'none';
             mainApp.style.display = 'block';
             render();
@@ -507,6 +511,7 @@ async function initSession(mode) {
             console.log("User cancelled or file error:", e);
         }
     } else {
+        // Mode is 'new'
         courses = [];
         activeFileHandle = null;
         welcomeSection.style.display = 'none';
@@ -515,41 +520,21 @@ async function initSession(mode) {
     }
 }
 
-     function parseCSV(csvText) {
-    const rows = csvText.trim().split('\n').slice(1); // Skip header
-    courses = [];
-    rows.forEach((row, idx) => {
-        const cols = row.split(',');
-        if (cols.length >= 4 && cols[0].trim()) {
-            courses.push({
-                year: parseInt(cols[0].trim()),
-                name: cols[1].trim(),
-                grade: parseInt(cols[2].trim()),
-                ects: parseFloat(cols[3].trim()),
-                timestamp: Date.now() + idx
-            });
-        }
-    });
-}    
-async function handleSave() {
-    let csv = "Year,Course,Grade,ECTS\n";
-    courses.forEach(c => csv += `${c.year},${c.name.replace(/,/g,"")},${c.grade},${c.ects}\n`);
-    
-    try {
-        if (activeFileHandle) {
-            const writable = await activeFileHandle.createWritable();
-            await writable.write(csv);
-            await writable.close();
-            document.getElementById('saveNotice').style.display = 'none';
-        } else {
-            activeFileHandle = await window.showSaveFilePicker({ 
-                suggestedName: 'tony_grades.csv',
-                types: [{ description: 'CSV Files', accept: {'text/csv': ['.csv']} }]
-            });
-            handleSave();
-        }
-    } catch (e) { fallbackSave(csv); }
-}
+         
+         async function handleSave() {
+             const payload = JSON.stringify({ courses }, null, 2);
+             try {
+                 if (activeFileHandle) {
+                     const writable = await activeFileHandle.createWritable();
+                     await writable.write(payload);
+                     await writable.close();
+                     document.getElementById('saveNotice').style.display = 'none';
+                 } else {
+                     activeFileHandle = await window.showSaveFilePicker({ suggestedName: 'tony_grades.json' });
+                     handleSave();
+                 }
+             } catch (e) { fallbackSave(payload); }
+         }
          
          function fallbackSave(content) {
              const a = document.createElement('a');
@@ -559,13 +544,17 @@ async function handleSave() {
              document.getElementById('saveNotice').style.display = 'none';
          }
          
-function fallbackSave(content) {
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([content], {type: 'text/csv'}));
-    a.download = 'tony_grades.csv';
-    a.click();
-    document.getElementById('saveNotice').style.display = 'none';
-}
+         function addCourse() {
+             const n = document.getElementById('courseName');
+             const g = parseInt(document.getElementById('courseGrade').value);
+             const e = parseFloat(document.getElementById('courseECTS').value);
+             const y = parseInt(document.getElementById('courseYear').value);
+             if (!n.value) return;
+             courses.unshift({ name: n.value, grade: g, ects: e, year: y, timestamp: Date.now() });
+             n.value = '';
+             document.getElementById('saveNotice').style.display = 'flex';
+             render();
+         }
          
          function deleteCourse(ts) {
              courses = courses.filter(c => c.timestamp !== ts);
@@ -600,38 +589,30 @@ function fallbackSave(content) {
          updateEffortMessage();
          }
          
-function exportToExcel() {
-    let csv = "Year,Course,Grade,ECTS\n";
-    courses.forEach(c => csv += `${c.year},${c.name.replace(/,/g,"")},${c.grade},${c.ects}\n`);
-    const link = document.createElement("a");
-    link.href = 'data:text/csv;charset=utf-8,' + encodeURI(csv);
-    link.download = "tony_grades_export.csv";
-    link.click();
-}
+         function exportToExcel() {
+             let csv = "Year,Course,Grade,ECTS\n";
+             courses.forEach(c => csv += `${c.year},${c.name.replace(/,/g,"")},${c.grade},${c.ects}\n`);
+             const link = document.createElement("a");
+             link.href = 'data:text/csv;charset=utf-8,' + encodeURI(csv);
+             link.download = "tony_grades_export.csv";
+             link.click();
+         }
          
-function importFromExcel(event) {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        const csvText = e.target.result;
-        const rows = csvText.trim().split('\n').slice(1);
-        courses = [];
-        rows.forEach((r, idx) => {
-            const cols = r.split(',');
-            if(cols.length >= 4 && cols[0].trim()) {
-                courses.push({ 
-                    year: parseInt(cols[0].trim()), 
-                    name: cols[1].trim(), 
-                    grade: parseInt(cols[2].trim()), 
-                    ects: parseFloat(cols[3].trim()), 
-                    timestamp: Date.now() + idx 
-                });
-            }
-        });
-        render(); 
-        document.getElementById('saveNotice').style.display = 'flex';
-    };
-    reader.readAsText(event.target.files[0]);
-}
+         function importFromExcel(event) {
+             const reader = new FileReader();
+             reader.onload = (e) => {
+                 const rows = e.target.result.split('\n').slice(1);
+                 rows.forEach((r, idx) => {
+                     const c = r.split(',');
+                     if(c.length >= 4) {
+                         courses.push({ year: parseInt(c[0]), name: c[1], grade: parseInt(c[2]), ects: parseFloat(c[3]), timestamp: Date.now() + idx });
+                     }
+                 });
+                 render(); 
+                 document.getElementById('saveNotice').style.display = 'flex';
+             };
+             reader.readAsText(event.target.files[0]);
+         }
          function updateEffortMessage() {
          const TOTAL_ECTS_REQUIRED = 240;
          const effortElement = document.getElementById('effort-message');
@@ -764,5 +745,4 @@ function shareSnapshot() {
       </script>
    </body>
 </html>
-
 
