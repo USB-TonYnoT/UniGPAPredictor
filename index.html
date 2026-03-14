@@ -750,19 +750,6 @@ function updateCourseNamePlaceholder() {
              displayCareerText(tier);
          }
          
-         // Flicker Logic
-         window.addEventListener('load', () => {
-         let currentImgIndex = 1;
-         setInterval(() => {
-             const currentImg = document.getElementById(`img${currentImgIndex}`);
-             if (currentImg) currentImg.classList.remove('active');
-             
-             currentImgIndex = (currentImgIndex % 3) + 1;
-             
-             const nextImg = document.getElementById(`img${currentImgIndex}`);
-             if (nextImg) nextImg.classList.add('active');
-         }, 3000);
-         });
          
          // NEW UNIFIED CSV LOADER
 async function loadOrImportCSV() {
