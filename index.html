@@ -552,7 +552,8 @@ const translations = {
         'effort-impossible': 'Δυστυχώς, με τους υπάρχοντες βαθμούς δεν μπορείτε να φτάσετε στο επίπεδο "{tier}".',
         'effort-on-track': 'Είστε ήδη σε τροχιά για το επίπεδο "{tier}"! Χρειάζεστε απλά τη βάση (5.0) στα υπόλοιπα μαθήματα.',
         'effort-required': 'Χρειάζεστε οι επόμενοι βαθμοί να έχουν μέσο όρο {average} προκειμένου να αποφοιτήσετε στο επίπεδο "{tier}".',
-        'save-notice-text': '⚠️ Μη αποθηκευμένοι Βαθμοί. Κάντε κλικ για Αποθήκευση Αλλαγών.'
+        'save-notice-text': '⚠️ Μη αποθηκευμένοι Βαθμοί. Κάντε κλικ για Αποθήκευση Αλλαγών.',
+        'course-suggestion-prefix': 'Μάθημα'
     },
     en: {
         'welcome-title': '🎓 Studies & Strategy Advisor',
@@ -598,7 +599,8 @@ const translations = {
         'effort-impossible': 'Unfortunately, with your current grades you cannot reach the "{tier}" level.',
         'effort-on-track': 'You are already on track for the "{tier}" level! You just need a passing grade (5.0) in the remaining courses.',
         'effort-required': 'You need your next grades to average {average} in order to graduate at the "{tier}" level.',
-        'save-notice-text': '⚠️ Unsaved Grades. Click Save Changes.'
+        'save-notice-text': '⚠️ Unsaved Grades. Click Save Changes.',
+        'course-suggestion-prefix': 'Course'
     }
 };
 
@@ -639,8 +641,10 @@ function setLanguage(lang) {
     
     // Update effort message if on main screen
     updateEffortMessage();
+    
+    // Update course name placeholder
+    updateCourseNamePlaceholder();
 }
-
 const careerData = {
     gr: {
         frog: `<b>"Βάτραχος" (5.0 – 6.5)</b> - Η αγορά εργασίας είναι ανταγωνιστική και το 5άρι απαιτεί "διορθωτικές κινήσεις".
@@ -692,6 +696,20 @@ const careerData = {
 
 function displayCareerText(val) { 
     document.getElementById('careerContent').innerHTML = careerData[currentLanguage][val]; 
+}
+
+function getNextCourseName() {
+    let num = 1;
+    const prefix = getTranslatedMessage('course-suggestion-prefix');
+    while (courses.some(c => c.name === `${prefix} ${num}`)) {
+        num++;
+    }
+    return `${prefix} ${num}`;
+}
+
+function updateCourseNamePlaceholder() {
+    const courseNameInput = document.getElementById('courseName');
+    courseNameInput.placeholder = getNextCourseName();
 }
          
          function updateCareerTier(gpa) {
@@ -809,8 +827,9 @@ async function initSession(mode) {
             const g = parseInt(document.getElementById('courseGrade').value);
             const e = parseFloat(document.getElementById('courseECTS').value);
             const y = parseInt(document.getElementById('courseYear').value);
-            if (!n.value) return;
-            courses.unshift({ name: n.value, grade: g, ects: e, year: y, timestamp: Date.now() });
+            let courseName = n.value || n.placeholder;
+            if (!courseName) return;
+            courses.unshift({ name: courseName, grade: g, ects: e, year: y, timestamp: Date.now() });
             currentSort = { column: null, direction: 'asc' };
             n.value = '';
             document.getElementById('saveNotice').style.display = 'flex';
@@ -881,6 +900,7 @@ async function initSession(mode) {
             }
             updateCareerTier(gpa);
          updateEffortMessage();
+         updateCourseNamePlaceholder();
          }
          
          async function exportToExcel() {
